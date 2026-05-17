@@ -8,6 +8,10 @@ st.set_page_config(page_title="⚡ Dash'SDR", layout="wide")
 st.title("⚡ Dash'SDR - Spécial DCE & Appels d'Offres")
 st.caption("Outil de structuration de données CRM & Alignement de valeur instantané")
 
+# Initialisation de la mémoire Streamlit pour économiser l'API Gemini
+if "live_pitches" not in st.session_state:
+    st.session_state.live_pitches = {}
+
 # =========================================================================
 # CONTEXTE PRODUIT COMMERCIAL - KAYRO (FÉVRIER 2026)
 # =========================================================================
@@ -102,42 +106,14 @@ def parse_sdr_line(line):
         prospect = "Non spécifié"
         company = remaining if remaining else "Entreprise Inconnue"
         
-    # 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE (Mise à jour exhaustive Fr/En)
+    # 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE
     lower_all = (company + " " + remaining).lower()
     
-    # Mots-clés pour les Bureaux d'Études et l'Ingénierie (À checker en premier)
-    keywords_bet = [
-        'etude', 'inge', 'conseil', 'architecture', 'archi', 'bet', 'moe', "maitrise d'oeuvre", 
-        'structure', 'economiste', 'acoustique', 'geometre', 'urbanisme', 'technique', 'solutions', 
-        'civil engineering', 'engineering', 'genie civil', 'infra', 'superstructure', 'consulting', 
-        'consultancy', 'architect', 'design office', 'cabinet', 'audit', 'expertise', 'amo', 'bureau d\'etudes'
-    ]
+    keywords_bet = ['etude', 'inge', 'conseil', 'architecture', 'archi', 'bet', 'moe', "maitrise d'oeuvre", 'structure', 'economiste', 'acoustique', 'geometre', 'urbanisme', 'technique', 'solutions', 'civil engineering', 'engineering', 'genie civil', 'infra', 'superstructure', 'consulting', 'consultancy', 'architect', 'design office', 'cabinet', 'audit', 'expertise', 'amo', 'bureau d\'etudes']
+    keywords_elec = ['elec', 'electricite', 'energie', 'fluide', 'spie', 'ineo', 'climatisation', 'cvc', 'chauffage', 'plomberie', 'thermique', 'cfa', 'cfo', 'courants forts', 'courants faibles', 'ventilation', 'solar', 'photovoltaique', 'sanitaire', 'genie climatique', 'engie', 'hvac', 'electricity', 'energy', 'electrical', 'plumbing', 'heating', 'lighting', 'cablage']
+    keywords_second = ['peinture', 'menuis', 'sol', 'platr', 'isolation', 'facade', 'etancheite', 'vitrerie', 'serrurerie', 'metallerie', 'agencement', 'platrerie', 'faux plafond', 'carrelage', 'renovation', 'finishing', 'interior', 'painting', 'drywall', 'insulation', 'tiling', 'flooring', 'carpentry', 'fit-out', 'revetement', 'placo', 'vitrage', 'amenagement']
+    keywords_gros = ['maconnerie', 'terrassement', 'demolition', 'gros oeuvre', 'fondation', 'charpente', 'beton', 'tp', 'travaux publics', 'vinci', 'eiffage construction', 'bouygues construction', 'general contractor', 'masonry', 'concrete', 'excavation', 'infrastructure', 'btp', 'construction', 'batiment', 'contractor']
     
-    # Mots-clés pour l'Électricité, les Fluides et le Génie Climatique
-    keywords_elec = [
-        'elec', 'electricite', 'energie', 'fluide', 'spie', 'ineo', 'climatisation', 'cvc', 
-        'chauffage', 'plomberie', 'thermique', 'cfa', 'cfo', 'courants forts', 'courants faibles', 
-        'ventilation', 'solar', 'photovoltaique', 'sanitaire', 'genie climatique', 'engie', 
-        'hvac', 'electricity', 'energy', 'electrical', 'plumbing', 'heating', 'lighting', 'cablage'
-    ]
-    
-    # Mots-clés pour le Second Œuvre et les Finitions
-    keywords_second = [
-        'peinture', 'menuis', 'sol', 'platr', 'isolation', 'facade', 'etancheite', 'vitrerie', 
-        'serrurerie', 'metallerie', 'agencement', 'platrerie', 'faux plafond', 'carrelage', 
-        'renovation', 'finishing', 'interior', 'painting', 'drywall', 'insulation', 'tiling', 
-        'flooring', 'carpentry', 'fit-out', 'revetement', 'placo', 'vitrage', 'amenagement'
-    ]
-    
-    # Mots-clés spécifiques au Gros Œuvre / Travaux Publics / Entreprises Générales
-    keywords_gros = [
-        'maconnerie', 'terrassement', 'demolition', 'gros oeuvre', 'fondation', 'charpente', 
-        'beton', 'tp', 'travaux publics', 'vinci', 'eiffage construction', 'bouygues construction', 
-        'general contractor', 'masonry', 'concrete', 'excavation', 'infrastructure', 'btp', 
-        'construction', 'batiment', 'contractor'
-    ]
-    
-    # LOGIQUE DE TRI PAR PRIORITÉ
     if any(x in lower_all for x in keywords_bet):
         sector = "📐 Bureau d'Études"
     elif any(x in lower_all for x in keywords_elec):
@@ -169,7 +145,6 @@ with st.sidebar:
         accept_multiple_files=True
     )
     
-    # Lecture simple du contenu des documents s'ils existent
     context_docs = ""
     if uploaded_docs:
         for doc in uploaded_docs:
@@ -185,7 +160,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
             model_name="gemini-2.0-flash",
-            tools=['google_search_retrieval']  # <-- La modification est ici !
+            tools=['google_search_retrieval']
         )
         
         full_context = KAYRO_OFFERS_CONTEXT
@@ -242,6 +217,7 @@ if raw_input:
         
         for idx, current_line in enumerate(lines):
             data = parse_sdr_line(current_line)
+            company_key = f"{data['company']}_{idx}"
             
             with st.container(border=True):
                 col_info, col_sector, col_pitch = st.columns([3, 3, 5])
@@ -269,11 +245,13 @@ if raw_input:
                     )
                 
                 with col_pitch:
-                    # Informations par défaut de la matrice standard
-                    pain_text = sdr_matrix[selected_sector]['pain']
-                    hook_text = sdr_matrix[selected_sector]['hook']
+                    # Si l'analyse a déjà été faite pour cette boîte, on la récupère dans la mémoire
+                    if company_key in st.session_state.live_pitches:
+                        pain_text, hook_text = st.session_state.live_pitches[company_key]
+                    else:
+                        pain_text = sdr_matrix[selected_sector]['pain']
+                        hook_text = sdr_matrix[selected_sector]['hook']
                     
-                    # Si la clé API est présente, on affiche l'activation de l'agent live
                     if gemini_key:
                         if st.button(f"🧠 Lancer l'Analyse Live pour {data['company']}", key=f"ai_btn_{idx}"):
                             with st.spinner("Recherche Google & analyse du site en cours..."):
@@ -283,6 +261,9 @@ if raw_input:
                                     context_docs, 
                                     gemini_key
                                 )
+                                # Sauvegarde immédiate du résultat pour ne plus jamais le recalculer
+                                st.session_state.live_pitches[company_key] = (pain_text, hook_text)
+                                st.session_state["trigger_refresh"] = True
                     
                     st.markdown(f"⚠️ **Le 'Pain' (DCE) :** {pain_text}")
                     st.success(f"🚀 **Accroche Téléphone :** {hook_text}")
