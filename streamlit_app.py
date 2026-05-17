@@ -6,7 +6,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="⚡ Dash'SDR", layout="wide")
 
 st.title("⚡ Dash'SDR - Spécial DCE & Appels d'Offres")
-st.caption("Version Ultra-Robuste : Avec contournement des restrictions de Quota Google")
+st.caption("Version Finale Stable - Forçage sur quota ouvert Gemini 1.5")
 
 # Initialisation de la mémoire Streamlit pour économiser l'API Gemini
 if "live_pitches" not in st.session_state:
@@ -131,28 +131,14 @@ def parse_sdr_line(line):
 with st.sidebar:
     st.header("🔑 Configuration de l'Agent IA")
     gemini_key = st.text_input("Colle ta clé API Gemini (Gratuite) :", type="password")
-    
-    st.markdown("---")
-    st.header("⚙️ Options de l'Agent")
-    # Ce bouton permet de désactiver la recherche Google pour contourner l'erreur 429
-    use_google_search = st.checkbox(
-        "Activer la recherche Google Live", 
-        value=False, 
-        help="Décochez cette case si vous avez une erreur de Quota (429). L'IA utilisera ses connaissances internes."
-    )
 
 # --- FONCTION AGENT RECHERCHE WEB & VALUE MAPPING ---
-def get_live_ai_pitch(company_name, sector, manual_context, api_key, use_search):
+def get_live_ai_pitch(company_name, sector, manual_context, api_key):
     try:
         genai.configure(api_key=api_key)
         
-        # Configuration dynamique des outils selon le choix de l'utilisateur
-        search_tools = ['google_search_retrieval'] if use_search else None
-        
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            tools=search_tools
-        )
+        # Forçage sur le modèle 1.5-flash pour utiliser le quota gratuit sans blocage
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
         
         prompt = f"""
         Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction.
@@ -161,7 +147,7 @@ def get_live_ai_pitch(company_name, sector, manual_context, api_key, use_search)
         CONTEXTE DU PROSPECT :
         - Entreprise : {company_name}
         - Secteur d'activité : {sector}
-        - Informations extraites ou fournies sur leur site : {manual_context if manual_context else "Utilise tes connaissances internes sur cette entreprise si tu la connais, ou base-toi de façon pointue sur son secteur."}
+        - Description de leur activité : {manual_context if manual_context else "Entreprise générale du secteur."}
         
         NOTRE CATALOGUE D'OFFRES KAYRO :
         ---
@@ -169,9 +155,9 @@ def get_live_ai_pitch(company_name, sector, manual_context, api_key, use_search)
         ---
         
         MISSION :
-        1. Identifie la meilleure offre ou module de Kayro pour cette entreprise.
-        2. Rédige un 'PAIN' (2-3 phrases max) ultra-réaliste par rapport à leurs chantiers ou leur quotidien de tri d'appels d'offres (cite un détail concret si connu).
-        3. Rédige un 'HOOK' (Moins de 15 mots) sous forme de question directe et percutante pour capter leur attention au téléphone.
+        1. Identifie le meilleur module de Kayro pour cette entreprise.
+        2. Rédige un 'PAIN' (2-3 phrases max) hyper-réaliste basé sur les informations fournies et leur secteur (sois très concret).
+        3. Rédige un 'HOOK' (Moins de 15 mots) sous forme de question directe et piquante pour le cold call.
         
         FORMAT DE RÉPONSE STRICT :
         PAIN: [Ton analyse]
@@ -187,7 +173,7 @@ def get_live_ai_pitch(company_name, sector, manual_context, api_key, use_search)
         return pain, hook
         
     except Exception as e:
-        return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration ou décocher la recherche Google."
+        return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration de votre clé API."
 
 # --- INTERFACE GRAPHIQUE PRINCIPALE ---
 raw_input = st.text_area(
@@ -230,7 +216,7 @@ if raw_input:
                         key=f"select_{idx}"
                     )
                     
-                    # PETITE ZONE DE TEXTE BONUS POUR CHAQUE CARTE
+                    # ZONE DE TEXTE POUR GUIDER L'IA
                     company_note = st.text_input(
                         "🔗 Optionnel : Colle un bout de texte de leur site web pour guider l'IA",
                         key=f"note_{idx}",
@@ -246,13 +232,12 @@ if raw_input:
                     
                     if gemini_key:
                         if st.button(f"🧠 Lancer l'Analyse Live pour {data['company']}", key=f"ai_btn_{idx}"):
-                            with st.spinner("Analyse en cours..."):
+                            with st.spinner("Analyse de valeur en cours..."):
                                 pain_text, hook_text = get_live_ai_pitch(
                                     data['company'], 
                                     selected_sector, 
                                     company_note, 
-                                    gemini_key,
-                                    use_google_search
+                                    gemini_key
                                 )
                                 st.session_state.live_pitches[company_key] = (pain_text, hook_text)
                     
