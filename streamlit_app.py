@@ -7,6 +7,52 @@ st.set_page_config(page_title="⚡ Dash'SDR", layout="wide")
 st.title("⚡ Dash'SDR - Spécial DCE & Appels d'Offres")
 st.caption("Outil de structuration de données CRM & Alignement de valeur instantané")
 
+# =========================================================================
+# CONTEXTE PRODUIT COMMERCIAL - KAYRO (FÉVRIER 2026)
+# =========================================================================
+KAYRO_OFFERS_CONTEXT = """
+OFFRES ET MODULES DE L'IA KAYRO :
+
+1. Traitement des Appels d'Offres (Réduction du temps de 3 jours à quelques heures) :
+- Lecture DCE & synthèse RC/CCTP/annexes (jusqu'à 800 pages) en quelques minutes.
+- Extraction automatique des délais, pénalités, clauses sensibles, pièces à fournir.
+- Scoring Go/No-Go et qualification des AO selon critères internes, allocation des équipes.
+- Génération de brouillons de mémoires techniques à partir du RC/CCTP et réutilisation des dossiers passés.
+- Adaptation automatique au donneur d'ordre et à ses critères d'évaluation.
+- Checklist de conformité : vérification du présent / manquant / à clarifier avant dépôt.
+- Pré-remplissage des informations administratives récurrentes (réduction des oublis).
+- Recherche sémantique dans l'historique des AO et des mémoires techniques passés.
+- Pré-remplissage et harmonisation des libellés DPGF en cohérence avec l'AO.
+
+2. Chiffrages & Consultation Fournisseurs :
+- Comparaison assistée des offres de consultation fournisseurs et analyse automatique des écarts.
+- Extraction automatique des devis (fin de la ressaisie manuelle, structuration automatique).
+- Benchmark interne et alertes sur les dérives de coûts par rapport à l'historique des chantiers.
+
+3. Suivi Opérationnel de Chantier :
+- Génération de comptes-rendus structurés automatiques par chantier à partir de notes vocales + photos.
+- Suivi et vérification de la conformité des sous-traitants (KBIS, attestations, alertes échéances, registre centralisé).
+- Génération de documents de sécurité : PPSPS, analyses de risques, check-lists HSE.
+- Détection des risques sur photos : rapprochement automatique avec l'analyse de risques et alertes de non-conformités.
+- Synthèse hebdomadaire de l'avancement, des risques et des points bloquants par chantier.
+
+4. Capitalisation & Fonctions Support :
+- Base de connaissances : recherche intelligente dans les DTU, REX chantiers et procédures internes.
+- Conformité produits : synthèse des avis techniques ATEX/CSTB et limites d'emploi.
+- Veille réglementaire : synthèses juridiques automatisées et schémas de process.
+- Automatisation administrative : génération de documents obligatoires, relances sous-traitants, mails récurrents.
+- Tri des mails et routage des actions : priorisation et extraction des tâches chantier/AO.
+- Synthèse Direction : tableau de bord mensuel en une page (alertes, avancements).
+- Recrutement : qualification des CV, shortlists et questions d'entretien sur les métiers en tension.
+
+RÉFÉRENCES ET ACTEURS ACCOMPAGNÉS :
+- Bédier, SPECV (Secteur : Rénovation)
+- G-ON, Sinteo (Secteur : Bureau d'études)
+- Legrand (Secteur : Géomètres)
+- FACE (Secteur : Bâtiments acier)
+- Groupe Legendre, K entreprise (Secteur : Construction générale - En discussion)
+"""
+
 # Matrice des douleurs et des accroches par secteur
 sdr_matrix = {
     "🧱 Gros Œuvre / BTP": {
@@ -109,6 +155,78 @@ def parse_sdr_line(line):
         "sector": sector
     }
 
+# --- BARRE LATÉRALE : CONFIGURATION IA & DOCS ---
+with st.sidebar:
+    st.header("🔑 Configuration de l'Agent IA")
+    gemini_key = st.text_input("Colle ta clé API Gemini (Gratuite) :", type="password")
+    
+    st.markdown("---")
+    st.header("📄 Tes Cas d'Usages / Sales Deck")
+    uploaded_docs = st.file_uploader(
+        "Importe le doc de ta boîte (TXT ou PDF) pour guider l'IA :", 
+        type=["txt", "pdf"], 
+        accept_multiple_files=True
+    )
+    
+    # Lecture simple du contenu des documents s'ils existent
+    context_docs = ""
+    if uploaded_docs:
+        for doc in uploaded_docs:
+            if doc.type == "text/plain":
+                context_docs += "\n" + str(doc.read(), "utf-8")
+            else:
+                context_docs += f"\n[Document joint: {doc.name}]" # Extension PDF traitable via pypdf si besoin
+        st.success("📚 Documents de contexte chargés !")
+
+import google.generativeai as genai
+
+def get_live_ai_pitch(company_name, sector, internal_context, api_key):
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            tools=[{"google_search": {}}]
+        )
+        
+        full_context = KAYRO_OFFERS_CONTEXT
+        if internal_context:
+            full_context += "\n\nINFORMATIONS COMPLÉMENTAIRES JOINTES :\n" + internal_context
+        
+        prompt = f"""
+        Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction.
+        Ton but est de préparer un appel de prospection téléphonique ultra-personnalisé.
+        
+        ÉTAPES À SUIVRE :
+        1. Fais une recherche Google en direct sur l'entreprise '{company_name}' (Secteur théorique : {sector}). Analyse leur site internet : quels types de projets ou chantiers précis réalisent-ils en ce moment ? Ont-ils des problématiques visibles (ex: marchés publics complexes, chantiers d'envergure, sous-traitance massive, ingénierie complexe, etc.) ?
+        
+        2. Analyse notre catalogue d'offres Kayro ci-dessous pour trouver le meilleur point d'ancrage :
+        ---
+        {{full_context}}
+        ---
+        
+        3. Fais le lien ("Value Mapping") : Sélectionne l'offre ou le module spécifique de Kayro qui apportera le plus de valeur immédiate à cette entreprise compte tenu de ses vrais projets trouvés sur le web.
+        
+        CONSIGNES DE RÉDACTION (Sois percutant, pas de jargon générique) :
+        - PAIN : Rédige une analyse de 2 à 3 phrases max. Identifie la douleur exacte qu'ils rencontrent sur leurs dossiers d'appels d'offres ou sur leurs chantiers. CITE UN EXEMPLE CONCRET ou un type de projet trouvé sur leur site pour prouver qu'on les connaît (ex: "Vu vos projets dans le domaine [X], la traque des pénalités de retard dans le CCTP doit vous prendre un temps fou...").
+        - HOOK : Rédige une seule question d'accroche (Moins de 15 mots), directe et piquante, à poser dès le début du cold call pour capter leur attention sur ce module précis de Kayro.
+        
+        FORMAT DE RÉPONSE STRICT :
+        PAIN: [Ton analyse]
+        HOOK: [Ta question d'accroche]
+        """
+        
+        response = model.generate_content(prompt)
+        text = response.text
+        
+        pain = text.split("PAIN:")[1].split("HOOK:")[0].strip() if "PAIN:" in text else "Analyse indisponible."
+        hook = text.split("HOOK:")[1].strip() if "HOOK:" in text else "Accroche indisponible."
+        
+        return pain, hook
+    except Exception as e:
+        return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration."
+
+} 
+        
 # --- INTERFACE GRAPHIQUE ---
 
 # Zone d'écriture des lignes CRM brutes
@@ -159,5 +277,21 @@ if raw_input:
                 
                 with col_pitch:
                     # Affichage dynamique en couleur des arguments et de l'accroche
-                    st.markdown(f"⚠️ **Le 'Pain' (DCE) :** {sdr_matrix[selected_sector]['pain']}")
-                    st.success(f"🚀 **Accroche Téléphone :** {sdr_matrix[selected_sector]['hook']}")
+                    with col_pitch:
+                    # Affichage par défaut de la matrice standard
+                    pain_text = sdr_matrix[selected_sector]['pain']
+                    hook_text = sdr_matrix[selected_sector]['hook']
+                    
+                    # Si la clé API est renseignée dans la sidebar, on affiche le bouton magique
+                    if gemini_key:
+                        if st.button(f"🧠 Lancer l'Analyse Live pour {data['company']}", key=f"ai_btn_{idx}"):
+                            with st.spinner("Recherche Google & analyse du site en cours..."):
+                                pain_text, hook_text = get_live_ai_pitch(
+                                    data['company'], 
+                                    selected_sector, 
+                                    context_docs, 
+                                    gemini_key
+                                )
+                    
+                    st.markdown(f"⚠️ **Le 'Pain' (DCE) :** {pain_text}")
+                    st.success(f"🚀 **Accroche Téléphone :** {hook_text}")
