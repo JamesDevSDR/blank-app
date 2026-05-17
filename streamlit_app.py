@@ -6,7 +6,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="⚡ Dash'SDR", layout="wide")
 
 st.title("⚡ Dash'SDR - Spécial DCE & Appels d'Offres")
-st.caption("Outil de structuration de données CRM & Alignement de valeur instantané")
+st.caption("Version Ultra-Robuste : Avec contournement des restrictions de Quota Google")
 
 # Initialisation de la mémoire Streamlit pour économiser l'API Gemini
 if "live_pitches" not in st.session_state:
@@ -80,22 +80,18 @@ sdr_matrix = {
 
 # Fonction de nettoyage et de découpage automatique (Parser)
 def parse_sdr_line(line):
-    # 1. Extraction Email
     email_match = re.search(r'[\w.-]+@[\w.-]+\.[\w.-]+', line)
     email = email_match.group(0) if email_match else ""
     if email: line = line.replace(email, "")
 
-    # 2. Extraction LinkedIn
     linkedin_match = re.search(r'https?://(www\.)?linkedin\.com/[^\s]+', line)
     linkedin = linkedin_match.group(0) if linkedin_match else ""
     if linkedin: line = line.replace(linkedin, "")
 
-    # 3. Extraction Téléphone
     phone_match = re.search(r'(?:\+?33|0)[1-9](?:[\s.-]*\d{2}){4}|\b33\d{9}\b', line)
     phone = phone_match.group(0) if phone_match else ""
     if phone: line = line.replace(phone, "")
 
-    # 4. Séparation Nom / Entreprise
     remaining = re.sub(r'\s+', ' ', line).strip()
     words = remaining.split(' ')
     
@@ -106,7 +102,6 @@ def parse_sdr_line(line):
         prospect = "Non spécifié"
         company = remaining if remaining else "Entreprise Inconnue"
         
-    # 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE
     lower_all = (company + " " + remaining).lower()
     
     keywords_bet = ['etude', 'inge', 'conseil', 'architecture', 'archi', 'bet', 'moe', "maitrise d'oeuvre", 'structure', 'economiste', 'acoustique', 'geometre', 'urbanisme', 'technique', 'solutions', 'civil engineering', 'engineering', 'genie civil', 'infra', 'superstructure', 'consulting', 'consultancy', 'architect', 'design office', 'cabinet', 'audit', 'expertise', 'amo', 'bureau d\'etudes']
@@ -132,58 +127,51 @@ def parse_sdr_line(line):
         "sector": sector
     }
 
-# --- BARRE LATÉRALE : CONFIGURATION IA & DOCS ---
+# --- BARRE LATÉRALE : CONFIGURATION IA ---
 with st.sidebar:
     st.header("🔑 Configuration de l'Agent IA")
     gemini_key = st.text_input("Colle ta clé API Gemini (Gratuite) :", type="password")
     
     st.markdown("---")
-    st.header("📄 Tes Cas d'Usages / Sales Deck")
-    uploaded_docs = st.file_uploader(
-        "Importe le doc de ta boîte (TXT ou PDF) pour guider l'IA :", 
-        type=["txt", "pdf"], 
-        accept_multiple_files=True
+    st.header("⚙️ Options de l'Agent")
+    # Ce bouton permet de désactiver la recherche Google pour contourner l'erreur 429
+    use_google_search = st.checkbox(
+        "Activer la recherche Google Live", 
+        value=False, 
+        help="Décochez cette case si vous avez une erreur de Quota (429). L'IA utilisera ses connaissances internes."
     )
-    
-    context_docs = ""
-    if uploaded_docs:
-        for doc in uploaded_docs:
-            if doc.type == "text/plain":
-                context_docs += "\n" + str(doc.read(), "utf-8")
-            else:
-                context_docs += f"\n[Document joint: {doc.name}]"
-        st.success("📚 Documents de contexte chargés !")
 
-# --- FONCTION AGENT RECHERCHE WEB ---
-def get_live_ai_pitch(company_name, sector, internal_context, api_key):
+# --- FONCTION AGENT RECHERCHE WEB & VALUE MAPPING ---
+def get_live_ai_pitch(company_name, sector, manual_context, api_key, use_search):
     try:
         genai.configure(api_key=api_key)
+        
+        # Configuration dynamique des outils selon le choix de l'utilisateur
+        search_tools = ['google_search_retrieval'] if use_search else None
+        
         model = genai.GenerativeModel(
             model_name="gemini-2.0-flash",
-            tools=['google_search_retrieval']
+            tools=search_tools
         )
-        
-        full_context = KAYRO_OFFERS_CONTEXT
-        if internal_context:
-            full_context += "\n\nINFORMATIONS COMPLÉMENTAIRES JOINTES :\n" + internal_context
         
         prompt = f"""
         Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction.
         Ton but est de préparer un appel de prospection téléphonique ultra-personnalisé.
         
-        ÉTAPES À SUIVRE :
-        1. Fais une recherche Google en direct sur l'entreprise '{company_name}' (Secteur théorique : {sector}). Analyse leur site internet : quels types de projets ou chantiers précis réalisent-ils en ce moment ? Ont-ils des problématiques visibles (ex: marchés publics complexes, chantiers d'envergure, sous-traitance massive, ingénierie complexe, etc.) ?
+        CONTEXTE DU PROSPECT :
+        - Entreprise : {company_name}
+        - Secteur d'activité : {sector}
+        - Informations extraites ou fournies sur leur site : {manual_context if manual_context else "Utilise tes connaissances internes sur cette entreprise si tu la connais, ou base-toi de façon pointue sur son secteur."}
         
-        2. Analyse notre catalogue d'offres Kayro ci-dessous pour trouver le meilleur point d'ancrage :
+        NOTRE CATALOGUE D'OFFRES KAYRO :
         ---
-        {full_context}
+        {KAYRO_OFFERS_CONTEXT}
         ---
         
-        3. Fais le lien ("Value Mapping") : Sélectionne l'offre ou le module spécifique de Kayro qui apportera le plus de valeur immédiate à cette entreprise compte tenu de ses vrais projets trouvés sur le web.
-        
-        CONSIGNES DE RÉDACTION (Sois percutant, pas de jargon générique) :
-        - PAIN : Rédige une analyse de 2 à 3 phrases max. Identifie la douleur exacte qu'ils rencontrent sur leurs dossiers d'appels d'offres ou sur leurs chantiers. CITE UN EXEMPLE CONCRET ou un type de projet trouvé sur leur site pour prouver qu'on les connaît (ex: "Vu vos projets dans le domaine [X], la traque des pénalités de retard dans le CCTP doit vous prendre un temps fou...").
-        - HOOK : Rédige une seule question d'accroche (Moins de 15 mots), directe et piquante, à poser dès le début du cold call pour capter leur attention sur ce module précis de Kayro.
+        MISSION :
+        1. Identifie la meilleure offre ou module de Kayro pour cette entreprise.
+        2. Rédige un 'PAIN' (2-3 phrases max) ultra-réaliste par rapport à leurs chantiers ou leur quotidien de tri d'appels d'offres (cite un détail concret si connu).
+        3. Rédige un 'HOOK' (Moins de 15 mots) sous forme de question directe et percutante pour capter leur attention au téléphone.
         
         FORMAT DE RÉPONSE STRICT :
         PAIN: [Ton analyse]
@@ -199,13 +187,13 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
         return pain, hook
         
     except Exception as e:
-        return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration."
-        
+        return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration ou décocher la recherche Google."
+
 # --- INTERFACE GRAPHIQUE PRINCIPALE ---
 raw_input = st.text_area(
     "1. Colle ici ta ligne ou ta liste de prospects copiée d'Excel / CRM :", 
     height=120, 
-    placeholder="Exemple :\nPhilippe Baudry Artea BTP 33609288487 philippe@arteia.com https://www.linkedin.com/in/philippe-baudry-5a1854a"
+    placeholder="Exemple :\nPhilippe Baudry Artea BTP 33609288487 philippe@arteia.com"
 )
 
 if raw_input:
@@ -231,10 +219,8 @@ if raw_input:
                     if data['email']: contacts.append(f"✉️ [Mail](mailto:{data['email']})")
                     if data['linkedin']: contacts.append(f"🔗 [LinkedIn]({data['linkedin']})")
                     
-                    if contacts:
-                        st.markdown(" | ".join(contacts))
-                    else:
-                        st.caption("Aucune coordonnée détectée")
+                    if contacts: st.markdown(" | ".join(contacts))
+                    else: st.caption("Aucune coordonnée détectée")
                 
                 with col_sector:
                     selected_sector = st.selectbox(
@@ -243,9 +229,15 @@ if raw_input:
                         index=list(sdr_matrix.keys()).index(data['sector']),
                         key=f"select_{idx}"
                     )
+                    
+                    # PETITE ZONE DE TEXTE BONUS POUR CHAQUE CARTE
+                    company_note = st.text_input(
+                        "🔗 Optionnel : Colle un bout de texte de leur site web pour guider l'IA",
+                        key=f"note_{idx}",
+                        placeholder="Ex: 'Spécialiste de la rénovation de monuments historiques...'"
+                    )
                 
                 with col_pitch:
-                    # Si l'analyse a déjà été faite pour cette boîte, on la récupère dans la mémoire
                     if company_key in st.session_state.live_pitches:
                         pain_text, hook_text = st.session_state.live_pitches[company_key]
                     else:
@@ -254,16 +246,15 @@ if raw_input:
                     
                     if gemini_key:
                         if st.button(f"🧠 Lancer l'Analyse Live pour {data['company']}", key=f"ai_btn_{idx}"):
-                            with st.spinner("Recherche Google & analyse du site en cours..."):
+                            with st.spinner("Analyse en cours..."):
                                 pain_text, hook_text = get_live_ai_pitch(
                                     data['company'], 
                                     selected_sector, 
-                                    context_docs, 
-                                    gemini_key
+                                    company_note, 
+                                    gemini_key,
+                                    use_google_search
                                 )
-                                # Sauvegarde immédiate du résultat pour ne plus jamais le recalculer
                                 st.session_state.live_pitches[company_key] = (pain_text, hook_text)
-                                st.session_state["trigger_refresh"] = True
                     
                     st.markdown(f"⚠️ **Le 'Pain' (DCE) :** {pain_text}")
                     st.success(f"🚀 **Accroche Téléphone :** {hook_text}")
