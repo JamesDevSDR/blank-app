@@ -193,7 +193,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
             full_context += "\n\nINFORMATIONS COMPLÉMENTAIRES JOINTES :\n" + internal_context
         
         prompt = f"""
-        Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction.
+        Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction[cite: 1, 2].
         Ton but est de préparer un appel de prospection téléphonique ultra-personnalisé.
         
         ÉTAPES À SUIVRE :
@@ -201,7 +201,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
         
         2. Analyse notre catalogue d'offres Kayro ci-dessous pour trouver le meilleur point d'ancrage :
         ---
-        {{full_context}}
+        {full_context}
         ---
         
         3. Fais le lien ("Value Mapping") : Sélectionne l'offre ou le module spécifique de Kayro qui apportera le plus de valeur immédiate à cette entreprise compte tenu de ses vrais projets trouvés sur le web.
@@ -221,11 +221,10 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
         pain = text.split("PAIN:")[1].split("HOOK:")[0].strip() if "PAIN:" in text else "Analyse indisponible."
         hook = text.split("HOOK:")[1].strip() if "HOOK:" in text else "Accroche indisponible."
         
-        return { pain, hook
+        return pain, hook
+        
     except Exception as e:
         return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration."
-
-    } 
         
 # --- INTERFACE GRAPHIQUE ---
 
