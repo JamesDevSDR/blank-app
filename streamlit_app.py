@@ -1,5 +1,6 @@
 import streamlit as st
 import re
+import google.generativeai as genai
 
 # Configuration de la page en mode Large pour ton double écran
 st.set_page_config(page_title="⚡ Dash'SDR", layout="wide")
@@ -101,7 +102,7 @@ def parse_sdr_line(line):
         prospect = "Non spécifié"
         company = remaining if remaining else "Entreprise Inconnue"
         
-# 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE (Mise à jour exhaustive Fr/En)
+    # 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE (Mise à jour exhaustive Fr/En)
     lower_all = (company + " " + remaining).lower()
     
     # Mots-clés pour les Bureaux d'Études et l'Ingénierie (À checker en premier)
@@ -136,7 +137,7 @@ def parse_sdr_line(line):
         'construction', 'batiment', 'contractor'
     ]
     
-  # LOGIQUE DE TRI PAR PRIORITÉ (Avec les noms de clés d'origine pour éviter le bug)
+    # LOGIQUE DE TRI PAR PRIORITÉ
     if any(x in lower_all for x in keywords_bet):
         sector = "📐 Bureau d'Études"
     elif any(x in lower_all for x in keywords_elec):
@@ -175,11 +176,10 @@ with st.sidebar:
             if doc.type == "text/plain":
                 context_docs += "\n" + str(doc.read(), "utf-8")
             else:
-                context_docs += f"\n[Document joint: {doc.name}]" # Extension PDF traitable via pypdf si besoin
+                context_docs += f"\n[Document joint: {doc.name}]"
         st.success("📚 Documents de contexte chargés !")
 
-import google.generativeai as genai
-
+# --- FONCTION AGENT RECHERCHE WEB ---
 def get_live_ai_pitch(company_name, sector, internal_context, api_key):
     try:
         genai.configure(api_key=api_key)
@@ -193,7 +193,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
             full_context += "\n\nINFORMATIONS COMPLÉMENTAIRES JOINTES :\n" + internal_context
         
         prompt = f"""
-        Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction[cite: 1, 2].
+        Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction.
         Ton but est de préparer un appel de prospection téléphonique ultra-personnalisé.
         
         ÉTAPES À SUIVRE :
@@ -226,9 +226,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
     except Exception as e:
         return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration."
         
-# --- INTERFACE GRAPHIQUE ---
-
-# Zone d'écriture des lignes CRM brutes
+# --- INTERFACE GRAPHIQUE PRINCIPALE ---
 raw_input = st.text_area(
     "1. Colle ici ta ligne ou ta liste de prospects copiée d'Excel / CRM :", 
     height=120, 
@@ -242,11 +240,9 @@ if raw_input:
         st.markdown("---")
         st.subheader("🎯 Tes Fiches d'Appels Personnalisées")
         
-        # Pour chaque ligne collée, on crée une "carte" visuelle claire
         for idx, current_line in enumerate(lines):
             data = parse_sdr_line(current_line)
             
-            # Encadré propre pour chaque prospect
             with st.container(border=True):
                 col_info, col_sector, col_pitch = st.columns([3, 3, 5])
                 
@@ -254,7 +250,6 @@ if raw_input:
                     st.markdown(f"### 👤 {data['prospect']}")
                     st.markdown(f"**🏢 Entreprise :** `{data['company']}`")
                     
-                    # Liens et contacts cliquables
                     contacts = []
                     if data['phone']: contacts.append(f"📞 **{data['phone']}**")
                     if data['email']: contacts.append(f"✉️ [Mail](mailto:{data['email']})")
@@ -266,7 +261,6 @@ if raw_input:
                         st.caption("Aucune coordonnée détectée")
                 
                 with col_sector:
-                    # Menu déroulant pour ajuster le secteur manuellement si l'auto-détection s'est trompée
                     selected_sector = st.selectbox(
                         f"Ajuster le secteur de {data['company']}", 
                         list(sdr_matrix.keys()), 
@@ -275,13 +269,11 @@ if raw_input:
                     )
                 
                 with col_pitch:
-                    # Affichage dynamique en couleur des arguments et de l'accroche
-                    with col_pitch:
-                    # Affichage par défaut de la matrice standard
+                    # Informations par défaut de la matrice standard
                     pain_text = sdr_matrix[selected_sector]['pain']
                     hook_text = sdr_matrix[selected_sector]['hook']
                     
-                    # Si la clé API est renseignée dans la sidebar, on affiche le bouton magique
+                    # Si la clé API est présente, on affiche l'activation de l'agent live
                     if gemini_key:
                         if st.button(f"🧠 Lancer l'Analyse Live pour {data['company']}", key=f"ai_btn_{idx}"):
                             with st.spinner("Recherche Google & analyse du site en cours..."):
