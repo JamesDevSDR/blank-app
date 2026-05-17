@@ -6,7 +6,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="⚡ Dash'SDR", layout="wide")
 
 st.title("⚡ Dash'SDR - Spécial DCE & Appels d'Offres")
-st.caption("Version Finale Stable - Forçage sur quota ouvert Gemini 1.5")
+st.caption("Version Ceinture + Bretelles : Anti-blocage et Générateur de Prompts de Secours")
 
 # Initialisation de la mémoire Streamlit pour économiser l'API Gemini
 if "live_pitches" not in st.session_state:
@@ -78,7 +78,6 @@ sdr_matrix = {
     }
 }
 
-# Fonction de nettoyage et de découpage automatique (Parser)
 def parse_sdr_line(line):
     email_match = re.search(r'[\w.-]+@[\w.-]+\.[\w.-]+', line)
     email = email_match.group(0) if email_match else ""
@@ -127,53 +126,45 @@ def parse_sdr_line(line):
         "sector": sector
     }
 
-# --- BARRE LATÉRALE : CONFIGURATION IA ---
+# --- BARRE LATÉRALE ---
 with st.sidebar:
     st.header("🔑 Configuration de l'Agent IA")
     gemini_key = st.text_input("Colle ta clé API Gemini (Gratuite) :", type="password")
+    st.caption("Si ton compte gratuit est bridé par Google, utilise le bouton de secours généré sur la fiche.")
 
-# --- FONCTION AGENT RECHERCHE WEB & VALUE MAPPING ---
+# --- FONCTION GÉNÉRATRICE DE PROMPT (PLAN B CLIQUE & COPIE) ---
+def build_fallback_prompt(company_name, sector, manual_context):
+    return f"""Tu es un SDR d'élite pour l'IA Kayro dédiée au BTP. Prépare un appel de prospection téléphonique personnalisé.
+
+PROSPECT :
+- Entreprise : {company_name}
+- Secteur : {sector}
+- Infos site : {manual_context if manual_context else "Entreprise du secteur."}
+
+NOTRE CATALOGUE :
+{KAYRO_OFFERS_CONTEXT}
+
+RÉPONDS STRICTEMENT SOUS CE FORMAT :
+PAIN: [Analyse de 2 phrases max sur leur douleur liée aux chantiers ou appels d'offres]
+HOOK: [Une seule question d'accroche percutante de moins de 15 mots]"""
+
+# --- FONCTION AGENT DIRECT VIA API ---
 def get_live_ai_pitch(company_name, sector, manual_context, api_key):
     try:
         genai.configure(api_key=api_key)
+        # Utilisation de la route universelle latest pour éviter le conflit v1beta
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest")
         
-        # Forçage sur le modèle 1.5-flash pour utiliser le quota gratuit sans blocage
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-        
-        prompt = f"""
-        Tu es un SDR d'élite pour la solution d'IA Kayro dédiée au secteur de la construction.
-        Ton but est de préparer un appel de prospection téléphonique ultra-personnalisé.
-        
-        CONTEXTE DU PROSPECT :
-        - Entreprise : {company_name}
-        - Secteur d'activité : {sector}
-        - Description de leur activité : {manual_context if manual_context else "Entreprise générale du secteur."}
-        
-        NOTRE CATALOGUE D'OFFRES KAYRO :
-        ---
-        {KAYRO_OFFERS_CONTEXT}
-        ---
-        
-        MISSION :
-        1. Identifie le meilleur module de Kayro pour cette entreprise.
-        2. Rédige un 'PAIN' (2-3 phrases max) hyper-réaliste basé sur les informations fournies et leur secteur (sois très concret).
-        3. Rédige un 'HOOK' (Moins de 15 mots) sous forme de question directe et piquante pour le cold call.
-        
-        FORMAT DE RÉPONSE STRICT :
-        PAIN: [Ton analyse]
-        HOOK: [Ta question d'accroche]
-        """
-        
+        prompt = build_fallback_prompt(company_name, sector, manual_context)
         response = model.generate_content(prompt)
         text = response.text
         
         pain = text.split("PAIN:")[1].split("HOOK:")[0].strip() if "PAIN:" in text else "Analyse indisponible."
         hook = text.split("HOOK:")[1].strip() if "HOOK:" in text else "Accroche indisponible."
-        
-        return pain, hook
-        
+        return pain, hook, False
     except Exception as e:
-        return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration de votre clé API."
+        # En cas d'échec de l'API, on renvoie l'erreur pour déclencher le mode secours
+        return f"Erreur Quota Google ({str(e)})", "", True
 
 # --- INTERFACE GRAPHIQUE PRINCIPALE ---
 raw_input = st.text_area(
@@ -204,7 +195,6 @@ if raw_input:
                     if data['phone']: contacts.append(f"📞 **{data['phone']}**")
                     if data['email']: contacts.append(f"✉️ [Mail](mailto:{data['email']})")
                     if data['linkedin']: contacts.append(f"🔗 [LinkedIn]({data['linkedin']})")
-                    
                     if contacts: st.markdown(" | ".join(contacts))
                     else: st.caption("Aucune coordonnée détectée")
                 
@@ -216,14 +206,14 @@ if raw_input:
                         key=f"select_{idx}"
                     )
                     
-                    # ZONE DE TEXTE POUR GUIDER L'IA
                     company_note = st.text_input(
-                        "🔗 Optionnel : Colle un bout de texte de leur site web pour guider l'IA",
+                        "🔗 Optionnel : Note sur l'activité",
                         key=f"note_{idx}",
-                        placeholder="Ex: 'Spécialiste de la rénovation de monuments historiques...'"
+                        placeholder="Ex: Rénovation, gros marchés..."
                     )
                 
                 with col_pitch:
+                    is_blocked = False
                     if company_key in st.session_state.live_pitches:
                         pain_text, hook_text = st.session_state.live_pitches[company_key]
                     else:
@@ -232,14 +222,23 @@ if raw_input:
                     
                     if gemini_key:
                         if st.button(f"🧠 Lancer l'Analyse Live pour {data['company']}", key=f"ai_btn_{idx}"):
-                            with st.spinner("Analyse de valeur en cours..."):
-                                pain_text, hook_text = get_live_ai_pitch(
-                                    data['company'], 
-                                    selected_sector, 
-                                    company_note, 
-                                    gemini_key
+                            with st.spinner("Calcul en cours..."):
+                                res_pain, res_hook, error_triggered = get_live_ai_pitch(
+                                    data['company'], selected_sector, company_note, gemini_key
                                 )
-                                st.session_state.live_pitches[company_key] = (pain_text, hook_text)
-                    
+                                if not error_triggered:
+                                    pain_text, hook_text = res_pain, res_hook
+                                    st.session_state.live_pitches[company_key] = (pain_text, hook_text)
+                                else:
+                                    is_blocked = True
+                                    pain_text = res_pain
+
                     st.markdown(f"⚠️ **Le 'Pain' (DCE) :** {pain_text}")
-                    st.success(f"🚀 **Accroche Téléphone :** {hook_text}")
+                    if hook_text:
+                        st.success(f"🚀 **Accroche Téléphone :** {hook_text}")
+                    
+                    # BLOC DE SECOURS AUTOMATIQUE EN CAS DE BLOCAGE QUOTA GOOGLE
+                    if "Erreur Quota" in pain_text or is_blocked:
+                        st.info("💡 **Plan B activé :** Google bloque ton API, mais le prompt sur-mesure a été généré ci-dessous. Copie-le et colle-le directement dans [Gemini Web Gratuit](https://gemini.google.com/) pour obtenir ton accroche immédiate.")
+                        text_prompt_fallback = build_fallback_prompt(data['company'], selected_sector, company_note)
+                        st.text_area("📋 Copie ce texte :", value=text_prompt_fallback, height=150, key=f"fallback_area_{idx}")
