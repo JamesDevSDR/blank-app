@@ -55,13 +55,23 @@ def parse_sdr_line(line):
         prospect = "Non spécifié"
         company = remaining if remaining else "Entreprise Inconnue"
         
-    # 5. Auto-détection du secteur par mot-clé
+# 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE
     lower_all = (company + " " + remaining).lower()
-    if any(x in lower_all for x in ['elec', 'energie', 'fluide', 'spie']):
+    
+    # Mots-clés pour l'Électricité et les Fluides
+    keywords_elec = ['elec', 'electricite', 'energie', 'fluide', 'spie', 'ineo', 'climatisation', 'cvc', 'chauffage', 'plomberie', 'thermique', 'cfa', 'cfo', 'courants forts', 'courants faibles', 'ventilation', 'solar', 'photovoltaique', 'sanitaire', 'genie climatique', 'engie']
+    
+    # Mots-clés pour les Bureaux d'Études et l'Ingénierie
+    keywords_bet = ['etude', 'inge', 'conseil', 'durand', 'architecture', 'archi', 'bet', 'moe', 'maitrise d\'oeuvre', 'structure', 'economiste', 'acoustique', 'geometre', 'urbanisme', 'technique', 'solutions']
+    
+    # Mots-clés pour le Second Œuvre
+    keywords_second = ['peinture', 'menuis', 'sol', 'platr', 'isolation', 'facade', 'etancheite', 'vitrerie', 'serrurerie', 'metallerie', 'agencement', 'platrerie', 'faux plafond', 'carrelage', 'renovation']
+    
+    if any(x in lower_all for x in keywords_elec):
         sector = "⚡ Électricité / Fluides"
-    elif any(x in lower_all for x in ['etude', 'inge', 'conseil', 'durand']):
+    elif any(x in lower_all for x in keywords_bet):
         sector = "📐 Bureau d'Études"
-    elif any(x in lower_all for x in ['peint', 'menuis', 'sol', 'platr']):
+    elif any(x in lower_all for x in keywords_second):
         sector = "🛠️ Second Œuvre"
     else:
         sector = "🧱 Gros Œuvre / BTP"
