@@ -55,25 +55,52 @@ def parse_sdr_line(line):
         prospect = "Non spécifié"
         company = remaining if remaining else "Entreprise Inconnue"
         
-# 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE
+# 5. DICTIONNAIRE SÉMANTIQUE DE TRI AUTOMATIQUE (Mise à jour exhaustive Fr/En)
     lower_all = (company + " " + remaining).lower()
     
-    # Mots-clés pour l'Électricité et les Fluides
-    keywords_elec = ['elec', 'electricite', 'energie', 'fluide', 'spie', 'ineo', 'climatisation', 'cvc', 'chauffage', 'plomberie', 'thermique', 'cfa', 'cfo', 'courants forts', 'courants faibles', 'ventilation', 'solar', 'photovoltaique', 'sanitaire', 'genie climatique', 'engie']
+    # Mots-clés pour les Bureaux d'Études et l'Ingénierie (À checker en premier)
+    keywords_bet = [
+        'etude', 'inge', 'conseil', 'architecture', 'archi', 'bet', 'moe', "maitrise d'oeuvre", 
+        'structure', 'economiste', 'acoustique', 'geometre', 'urbanisme', 'technique', 'solutions', 
+        'civil engineering', 'engineering', 'genie civil', 'infra', 'superstructure', 'consulting', 
+        'consultancy', 'architect', 'design office', 'cabinet', 'audit', 'expertise', 'amo', 'bureau d\'etudes'
+    ]
     
-    # Mots-clés pour les Bureaux d'Études et l'Ingénierie
-    keywords_bet = ['etude', 'inge', 'conseil', 'durand', 'architecture', 'archi', 'bet', 'moe', 'maitrise d\'oeuvre', 'structure', 'economiste', 'acoustique', 'geometre', 'urbanisme', 'technique', 'solutions']
+    # Mots-clés pour l'Électricité, les Fluides et le Génie Climatique
+    keywords_elec = [
+        'elec', 'electricite', 'energie', 'fluide', 'spie', 'ineo', 'climatisation', 'cvc', 
+        'chauffage', 'plomberie', 'thermique', 'cfa', 'cfo', 'courants forts', 'courants faibles', 
+        'ventilation', 'solar', 'photovoltaique', 'sanitaire', 'genie climatique', 'engie', 
+        'hvac', 'electricity', 'energy', 'electrical', 'plumbing', 'heating', 'lighting', 'cablage'
+    ]
     
-    # Mots-clés pour le Second Œuvre
-    keywords_second = ['peinture', 'menuis', 'sol', 'platr', 'isolation', 'facade', 'etancheite', 'vitrerie', 'serrurerie', 'metallerie', 'agencement', 'platrerie', 'faux plafond', 'carrelage', 'renovation']
+    # Mots-clés pour le Second Œuvre et les Finitions
+    keywords_second = [
+        'peinture', 'menuis', 'sol', 'platr', 'isolation', 'facade', 'etancheite', 'vitrerie', 
+        'serrurerie', 'metallerie', 'agencement', 'platrerie', 'faux plafond', 'carrelage', 
+        'renovation', 'finishing', 'interior', 'painting', 'drywall', 'insulation', 'tiling', 
+        'flooring', 'carpentry', 'fit-out', 'revetement', 'placo', 'vitrage', 'amenagement'
+    ]
     
-    if any(x in lower_all for x in keywords_elec):
-        sector = "⚡ Électricité / Fluides"
-    elif any(x in lower_all for x in keywords_bet):
-        sector = "📐 Bureau d'Études"
+    # Mots-clés spécifiques au Gros Œuvre / Travaux Publics / Entreprises Générales
+    keywords_gros = [
+        'maconnerie', 'terrassement', 'demolition', 'gros oeuvre', 'fondation', 'charpente', 
+        'beton', 'tp', 'travaux publics', 'vinci', 'eiffage construction', 'bouygues construction', 
+        'general contractor', 'masonry', 'concrete', 'excavation', 'infrastructure', 'btp', 
+        'construction', 'batiment', 'contractor'
+    ]
+    
+    # LOGIQUE DE TRI PAR PRIORITÉ (Élimine le problème du mot "BTP" global)
+    if any(x in lower_all for x in keywords_bet):
+        sector = "📐 Bureau d'Études / Ingénierie / Archi"
+    elif any(x in lower_all for x in keywords_elec):
+        sector = "⚡ Électricité / Fluides / CVC"
     elif any(x in lower_all for x in keywords_second):
-        sector = "🛠️ Second Œuvre"
+        sector = "🛠️ Second Œuvre / Finitions"
+    elif any(x in lower_all for x in keywords_gros):
+        sector = "🧱 Gros Œuvre / BTP"
     else:
+        # Sécurité si aucun mot de la matrice n'est trouvé
         sector = "🧱 Gros Œuvre / BTP"
 
     return {
