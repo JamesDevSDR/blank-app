@@ -90,17 +90,14 @@ def parse_sdr_line(line):
         'construction', 'batiment', 'contractor'
     ]
     
-    # LOGIQUE DE TRI PAR PRIORITÉ (Élimine le problème du mot "BTP" global)
+  # LOGIQUE DE TRI PAR PRIORITÉ (Avec les noms de clés d'origine pour éviter le bug)
     if any(x in lower_all for x in keywords_bet):
-        sector = "📐 Bureau d'Études / Ingénierie / Archi"
+        sector = "📐 Bureau d'Études"
     elif any(x in lower_all for x in keywords_elec):
-        sector = "⚡ Électricité / Fluides / CVC"
+        sector = "⚡ Électricité / Fluides"
     elif any(x in lower_all for x in keywords_second):
-        sector = "🛠️ Second Œuvre / Finitions"
-    elif any(x in lower_all for x in keywords_gros):
-        sector = "🧱 Gros Œuvre / BTP"
+        sector = "🛠️ Second Œuvre"
     else:
-        # Sécurité si aucun mot de la matrice n'est trouvé
         sector = "🧱 Gros Œuvre / BTP"
 
     return {
