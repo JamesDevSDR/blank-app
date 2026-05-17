@@ -225,7 +225,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
     except Exception as e:
         return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration."
 
-} 
+    } 
         
 # --- INTERFACE GRAPHIQUE ---
 
