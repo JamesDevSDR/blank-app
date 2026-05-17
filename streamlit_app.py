@@ -221,7 +221,7 @@ def get_live_ai_pitch(company_name, sector, internal_context, api_key):
         pain = text.split("PAIN:")[1].split("HOOK:")[0].strip() if "PAIN:" in text else "Analyse indisponible."
         hook = text.split("HOOK:")[1].strip() if "HOOK:" in text else "Accroche indisponible."
         
-        return pain, hook
+        return { pain, hook
     except Exception as e:
         return f"Erreur IA : {str(e)}", "Veuillez vérifier la configuration."
 
